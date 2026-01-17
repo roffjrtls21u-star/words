@@ -1,341 +1,132 @@
-import React, { useState, useEffect } from 'react';
-import { Play, RotateCcw, Trophy, Star, CheckCircle, XCircle, Globe, MapPin } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="ko">
 
-// --- 디자인 및 스타일 설정 (요청하신 CSS 포함) ---
-const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Spline+Sans:wght@400;500;600;700;800&display=swap');
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="AI가 생성하는 재미있는 퀴즈 게임 - 국기, 수도, 수학, 상식 퀴즈">
+  <title>🎮 퀴즈 월드컵</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
 
-  body {
-    font-family: 'Spline Sans', sans-serif;
-    margin: 0;
-    padding: 0;
-    overflow: hidden; /* 앱 같은 느낌 */
-  }
+<body>
+  <!-- 설정 버튼 -->
+  <button id="settings-btn" class="settings-btn" onclick="openSettings()" style="display: none;">⚙️</button>
 
-  .cloud-bg {
-    background-color: #f7f7d4;
-    background-image: 
-      radial-gradient(circle at 20% 30%, white 0%, transparent 20%),
-      radial-gradient(circle at 80% 15%, white 0%, transparent 15%),
-      radial-gradient(circle at 50% 85%, white 0%, transparent 25%);
-    background-attachment: fixed;
-    background-size: cover;
-  }
+  <div class="container">
 
-  .pillowy-shadow {
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05), inset 0 -4px 0 rgba(0,0,0,0.1);
-  }
-  
-  .pillowy-button {
-    box-shadow: 0 6px 0 #e5e5e5, 0 10px 10px rgba(0,0,0,0.1);
-    transition: all 0.1s;
-  }
-  
-  .pillowy-button:active {
-    transform: translateY(6px);
-    box-shadow: 0 0 0 #e5e5e5, inset 0 2px 5px rgba(0,0,0,0.1);
-  }
+    <!-- ===== API 키 입력 화면 ===== -->
+    <div id="api-screen" class="screen active">
+      <div class="card">
+        <div class="api-icon">🔑</div>
+        <h1 class="title">퀴즈 월드컵</h1>
+        <p class="subtitle">AI가 생성하는 재미있는 퀴즈!</p>
 
-  .btn-primary {
-    background-color: #ff6bc1;
-    color: white;
-    box-shadow: 0 6px 0 #d64598, 0 10px 10px rgba(0,0,0,0.15);
-  }
-  
-  .btn-primary:active {
-    box-shadow: 0 0 0 #d64598, inset 0 2px 5px rgba(0,0,0,0.2);
-  }
+        <div class="input-group">
+          <label for="api-key-input">Gemini API 키</label>
+          <input type="password" id="api-key-input" placeholder="API 키를 입력하세요">
+        </div>
 
-  /* 애니메이션 */
-  @keyframes popIn {
-    0% { transform: scale(0.8); opacity: 0; }
-    100% { transform: scale(1); opacity: 1; }
-  }
-  
-  .animate-pop {
-    animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-  }
+        <button class="btn btn-primary" onclick="saveApiKey()">
+          🚀 시작하기
+        </button>
 
-  @keyframes float {
-    0% { transform: translateY(0px); }
-    50% { transform: translateY(-10px); }
-    100% { transform: translateY(0px); }
-  }
-  .animate-float {
-    animation: float 3s ease-in-out infinite;
-  }
-`;
-
-// --- 퀴즈 데이터 (Gemini가 생성한 데이터베이스 역할) ---
-const COUNTRY_DATA = [
-  { code: 'kr', name: '대한민국', capital: '서울', emoji: '🇰🇷' },
-  { code: 'us', name: '미국', capital: '워싱턴 D.C.', emoji: '🇺🇸' },
-  { code: 'jp', name: '일본', capital: '도쿄', emoji: '🇯🇵' },
-  { code: 'cn', name: '중국', capital: '베이징', emoji: '🇨🇳' },
-  { code: 'gb', name: '영국', capital: '런던', emoji: '🇬🇧' },
-  { code: 'fr', name: '프랑스', capital: '파리', emoji: '🇫🇷' },
-  { code: 'de', name: '독일', capital: '베를린', emoji: '🇩🇪' },
-  { code: 'it', name: '이탈리아', capital: '로마', emoji: '🇮🇹' },
-  { code: 'ca', name: '캐나다', capital: '오타와', emoji: '🇨🇦' },
-  { code: 'au', name: '호주', capital: '캔버라', emoji: '🇦🇺' },
-  { code: 'vn', name: '베트남', capital: '하노이', emoji: '🇻🇳' },
-  { code: 'th', name: '태국', capital: '방콕', emoji: '🇹🇭' },
-  { code: 'in', name: '인도', capital: '뉴델리', emoji: '🇮🇳' },
-  { code: 'br', name: '브라질', capital: '브라질리아', emoji: '🇧🇷' },
-  { code: 'es', name: '스페인', capital: '마드리드', emoji: '🇪🇸' },
-  { code: 'eg', name: '이집트', capital: '카이로', emoji: '🇪🇬' },
-];
-
-// --- 유틸리티 함수 ---
-const getRandomItems = (array, count) => {
-  const shuffled = [...array].sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, count);
-};
-
-const generateQuiz = () => {
-  // 5개의 문제를 생성
-  const questions = [];
-  const selectedCountries = getRandomItems(COUNTRY_DATA, 5);
-
-  selectedCountries.forEach((country) => {
-    const isFlagQuiz = Math.random() > 0.5; // 50% 확률로 국기 또는 수도 퀴즈
-    
-    // 오답 보기 생성 (현재 정답 나라 제외하고 3개 무작위 선택)
-    const distractors = getRandomItems(
-      COUNTRY_DATA.filter(c => c.code !== country.code), 
-      3
-    );
-
-    if (isFlagQuiz) {
-      // 국기 퀴즈: 국기를 보고 나라 이름 맞히기
-      questions.push({
-        type: 'flag',
-        questionText: '이 국기는 어느 나라일까요?',
-        image: `https://flagcdn.com/w320/${country.code}.png`,
-        correctAnswer: country.name,
-        options: getRandomItems([country.name, ...distractors.map(d => d.name)], 4)
-      });
-    } else {
-      // 수도 퀴즈: 나라 이름을 보고 수도 맞히기 (유치원생을 위해 국기 힌트 포함)
-      questions.push({
-        type: 'capital',
-        questionText: `${country.name}의 수도는 어디일까요?`,
-        subText: `국기 힌트: ${country.emoji}`,
-        correctAnswer: country.capital,
-        options: getRandomItems([country.capital, ...distractors.map(d => d.capital)], 4)
-      });
-    }
-  });
-
-  return questions;
-};
-
-// --- 컴포넌트 ---
-
-export default function App() {
-  const [gameState, setGameState] = useState('home'); // home, quiz, result
-  const [questions, setQuestions] = useState([]);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
-  const [isCorrect, setIsCorrect] = useState(null); // true, false, or null
-  const [feedbackMessage, setFeedbackMessage] = useState('');
-
-  const startGame = () => {
-    const newQuestions = generateQuiz();
-    setQuestions(newQuestions);
-    setCurrentQuestionIndex(0);
-    setScore(0);
-    setGameState('quiz');
-    setSelectedAnswer(null);
-    setIsCorrect(null);
-  };
-
-  const handleAnswerClick = (answer) => {
-    if (selectedAnswer) return; // 이미 선택했으면 무시
-
-    const currentQuestion = questions[currentQuestionIndex];
-    const correct = answer === currentQuestion.correctAnswer;
-    
-    setSelectedAnswer(answer);
-    setIsCorrect(correct);
-
-    if (correct) {
-      setScore(s => s + 1);
-      setFeedbackMessage('최고예요! 🎉');
-    } else {
-      setFeedbackMessage(`아쉽네요! 정답은 ${currentQuestion.correctAnswer} 였어요.`);
-    }
-
-    // 1.5초 후 다음 문제로
-    setTimeout(() => {
-      if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex(prev => prev + 1);
-        setSelectedAnswer(null);
-        setIsCorrect(null);
-        setFeedbackMessage('');
-      } else {
-        setGameState('result');
-      }
-    }, 2000);
-  };
-
-  return (
-    <div className="min-h-screen cloud-bg flex items-center justify-center p-4">
-      <style>{styles}</style>
-
-      <div className="w-full max-w-lg">
-        {/* --- 홈 화면 --- */}
-        {gameState === 'home' && (
-          <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 text-center pillowy-shadow animate-pop border-4 border-white">
-            <div className="w-32 h-32 bg-[#ff6bc1] rounded-full mx-auto mb-6 flex items-center justify-center shadow-lg animate-float">
-              <Globe size={64} color="white" strokeWidth={2.5} />
-            </div>
-            <h1 className="text-4xl font-black text-[#261f2e] mb-2 tracking-tight">
-              나라 퀴즈 탐험
-            </h1>
-            <p className="text-gray-500 mb-8 font-medium text-lg">
-              국기와 수도를 재미있게 배워봐요!
-            </p>
-            
-            <button 
-              onClick={startGame}
-              className="w-full btn-primary py-5 rounded-2xl text-2xl font-bold flex items-center justify-center gap-3 transform transition hover:scale-105 active:scale-95"
-            >
-              <Play fill="currentColor" /> 게임 시작
-            </button>
-            
-            <div className="mt-8 grid grid-cols-2 gap-4">
-               <div className="bg-[#f7f7d4] p-4 rounded-xl text-[#261f2e] font-bold text-sm">
-                 🚩 국기 맞히기
-               </div>
-               <div className="bg-[#d4f7f7] p-4 rounded-xl text-[#261f2e] font-bold text-sm">
-                 🏛️ 수도 맞히기
-               </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- 퀴즈 화면 --- */}
-        {gameState === 'quiz' && questions.length > 0 && (
-          <div className="w-full">
-            {/* 상단 진행바 */}
-            <div className="flex justify-between items-center mb-6 px-2">
-              <div className="bg-white px-4 py-2 rounded-full shadow-sm font-bold text-[#ff6bc1] flex items-center gap-2">
-                <Star fill="#ff6bc1" size={18} /> 
-                점수: {score}
-              </div>
-              <div className="bg-white px-4 py-2 rounded-full shadow-sm font-bold text-gray-500">
-                문제 {currentQuestionIndex + 1} / {questions.length}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl p-6 pillowy-shadow border-4 border-white relative overflow-hidden">
-               {/* 질문 영역 */}
-               <div className="text-center mb-8">
-                  <span className="inline-block bg-[#f7f7d4] text-[#261f2e] px-3 py-1 rounded-full text-sm font-bold mb-4">
-                    {questions[currentQuestionIndex].type === 'flag' ? '국기 퀴즈 🚩' : '수도 퀴즈 🏛️'}
-                  </span>
-                  
-                  <h2 className="text-2xl font-black text-[#261f2e] mb-4">
-                    {questions[currentQuestionIndex].questionText}
-                  </h2>
-                  
-                  {questions[currentQuestionIndex].subText && (
-                    <p className="text-lg mb-4 text-gray-500">{questions[currentQuestionIndex].subText}</p>
-                  )}
-
-                  {questions[currentQuestionIndex].type === 'flag' && (
-                    <div className="mx-auto w-full max-w-[280px] h-48 bg-gray-100 rounded-xl overflow-hidden shadow-inner border-4 border-gray-100 mb-4 flex items-center justify-center">
-                      <img 
-                        src={questions[currentQuestionIndex].image} 
-                        alt="Flag" 
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  )}
-               </div>
-
-               {/* 보기 영역 */}
-               <div className="grid grid-cols-2 gap-4">
-                  {questions[currentQuestionIndex].options.map((option, idx) => {
-                    let btnClass = "bg-white text-gray-700 pillowy-button hover:bg-gray-50";
-                    
-                    if (selectedAnswer) {
-                      if (option === questions[currentQuestionIndex].correctAnswer) {
-                        btnClass = "bg-green-400 text-white pillowy-button ring-4 ring-green-200"; // 정답
-                      } else if (option === selectedAnswer) {
-                        btnClass = "bg-red-400 text-white pillowy-button ring-4 ring-red-200"; // 오답 선택
-                      } else {
-                        btnClass = "bg-gray-100 text-gray-400 opacity-50"; // 나머지
-                      }
-                    }
-
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => handleAnswerClick(option)}
-                        disabled={!!selectedAnswer}
-                        className={`
-                          ${btnClass}
-                          py-6 px-2 rounded-xl text-lg font-bold
-                          flex items-center justify-center text-center leading-tight
-                          min-h-[80px] transition-all
-                        `}
-                      >
-                        {option}
-                      </button>
-                    );
-                  })}
-               </div>
-
-               {/* 피드백 오버레이 */}
-               {selectedAnswer && (
-                 <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] flex flex-col items-center justify-center animate-pop z-10 rounded-2xl">
-                    <div className={`p-6 rounded-3xl shadow-2xl mb-4 ${isCorrect ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                      {isCorrect ? <CheckCircle size={64} strokeWidth={3} /> : <XCircle size={64} strokeWidth={3} />}
-                    </div>
-                    <div className="bg-white px-6 py-3 rounded-xl shadow-lg font-bold text-xl text-[#261f2e]">
-                      {feedbackMessage}
-                    </div>
-                 </div>
-               )}
-            </div>
-          </div>
-        )}
-
-        {/* --- 결과 화면 --- */}
-        {gameState === 'result' && (
-          <div className="bg-white/90 backdrop-blur-md rounded-3xl p-8 text-center pillowy-shadow animate-pop border-4 border-white">
-            <div className="mb-6 relative inline-block">
-               <Trophy size={80} className="text-yellow-400 drop-shadow-lg animate-float" fill="currentColor" />
-               <Star size={30} className="text-[#ff6bc1] absolute -top-2 -right-4 animate-spin-slow" fill="currentColor" />
-            </div>
-            
-            <h2 className="text-3xl font-black text-[#261f2e] mb-2">퀴즈 끝!</h2>
-            
-            <div className="bg-[#f7f7d4] rounded-2xl p-6 my-6">
-              <p className="text-gray-500 font-bold mb-2">내 점수는?</p>
-              <div className="text-5xl font-black text-[#ff6bc1] tracking-tighter">
-                {score} / {questions.length}
-              </div>
-            </div>
-
-            <p className="text-gray-600 font-medium mb-8 text-lg">
-              {score === questions.length ? "와우! 퀴즈 천재예요! 🏆" : 
-               score >= 3 ? "참 잘했어요! 조금만 더 힘내요! 🌟" : 
-               "괜찮아요! 다시 도전해볼까요? 💪"}
-            </p>
-
-            <button 
-              onClick={startGame}
-              className="w-full btn-primary py-5 rounded-2xl text-xl font-bold flex items-center justify-center gap-2 transform transition hover:scale-105 active:scale-95"
-            >
-              <RotateCcw /> 다시 하기
-            </button>
-          </div>
-        )}
+        <p style="margin-top: 20px; text-align: center; font-size: 13px; color: #94a3b8;">
+          <a href="https://aistudio.google.com/apikey" target="_blank" style="color: #6366f1;">
+            Google AI Studio에서 API 키 발급받기 →
+          </a>
+        </p>
       </div>
     </div>
-  );
-}
+
+    <!-- ===== 메인 메뉴 화면 ===== -->
+    <div id="menu-screen" class="screen">
+      <div class="card">
+        <div class="menu-header">
+          <div class="menu-logo">🎮</div>
+          <h1 class="title">퀴즈 월드컵</h1>
+          <p class="subtitle">게임을 선택하세요!</p>
+        </div>
+
+        <div id="game-grid" class="game-grid">
+          <!-- JavaScript로 동적 생성 -->
+        </div>
+
+        <button class="btn btn-primary" onclick="startGame()">
+          ▶️ 게임 시작
+        </button>
+      </div>
+    </div>
+
+    <!-- ===== 퀴즈 화면 ===== -->
+    <div id="quiz-screen" class="screen">
+      <div class="card">
+        <!-- 로딩 -->
+        <div id="loading" class="loading" style="display: none;">
+          <div class="spinner"></div>
+          <p class="loading-text">AI가 문제를 만들고 있어요...</p>
+        </div>
+
+        <!-- 퀴즈 내용 -->
+        <div id="quiz-content">
+          <div class="quiz-header">
+            <div class="score-badge">
+              ⭐ 점수: <span id="score-value">0</span>
+            </div>
+            <div class="progress-badge">
+              <span id="progress-value">1 / 5</span>
+            </div>
+          </div>
+
+          <div class="question-box">
+            <span id="question-type" class="question-type">🚩 국기 퀴즈</span>
+            <h2 id="question-text" class="question-text">문제가 여기에 표시됩니다</h2>
+            <img id="flag-image" class="flag-image" src="" alt="국기" style="display: none;">
+          </div>
+
+          <div id="options-grid" class="options-grid">
+            <!-- JavaScript로 동적 생성 -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 결과 화면 ===== -->
+    <div id="result-screen" class="screen">
+      <div class="card">
+        <div id="result-icon" class="result-icon">🏆</div>
+        <h1 class="result-title">퀴즈 완료!</h1>
+
+        <div class="score-display">
+          <p class="score-label">최종 점수</p>
+          <p id="result-score" class="score-value">5 / 5</p>
+        </div>
+
+        <p id="result-message" class="result-message">완벽해요! 퀴즈 천재!</p>
+
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="playAgain()">
+            🔄 다시 하기
+          </button>
+          <button class="btn btn-secondary" onclick="goToMenu()">
+            🏠 메뉴로
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 피드백 오버레이 -->
+  <div id="feedback-overlay" class="feedback-overlay" style="display: none;">
+    <div class="feedback-card">
+      <div id="feedback-icon" class="feedback-icon">🎉</div>
+      <p id="feedback-text" class="feedback-text">정답이에요!</p>
+      <p id="feedback-answer" class="feedback-answer"></p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
